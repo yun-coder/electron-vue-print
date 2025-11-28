@@ -1,7 +1,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { message, Row, Col, Button, Card } from 'ant-design-vue';
+import { message} from 'ant-design-vue';
 
 const printerList = ref([]);
 const loading = ref(false);
@@ -35,12 +35,22 @@ async function printBarCode() {
     message.error("条形码打印失败");
   }
 }
+
+async function getPrintJobs() {
+  try {
+    const jobs = await window.electronAPI.getPrintJobs();
+    console.log("当前打印任务：", jobs);
+    message.success("获取打印任务成功，查看控制台日志");
+  } catch (e) {
+    message.error("获取打印任务失败");
+  }
+}
 </script>
 
 <template>
   <div class="main-card">
     <a-card title="打印功能演示" bordered>
-      <a-row :gutter="16">
+      <a-row>
         <a-col :span="8">
           <a-button type="primary" block :loading="loading" @click="fetchPrinters">获取打印机列表</a-button>
         </a-col>
@@ -49,6 +59,9 @@ async function printBarCode() {
         </a-col>
         <a-col :span="8">
           <a-button type="primary" block @click="printBarCode">静默打印条形码</a-button>
+        </a-col>
+        <a-col :span="8">
+          <a-button type="primary" block @click="getPrintJobs">获取打印任务</a-button>
         </a-col>
       </a-row>
       <a-row :gutter="16" style="margin-top: 24px;">
