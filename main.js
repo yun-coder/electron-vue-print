@@ -73,41 +73,54 @@ async function getPrintJobs(printerName = null) {
     }
 }
 
+
 // 获取默认打印机名称
 async function getDefaultPrinterName() {
     try {
-        // 使用和其他函数相同的编码处理方法
+        // 首先尝试使用Windows API方式获取默认打印机
+        const winApiCommand = `powershell -NoProfile -Command "$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; (Get-WmiObject -Class Win32_Printer | Where-Object {$_.Default -eq $true}).Name"`;
+        const {stdout: winApiStdout} = await execPromise(winApiCommand, {
+            encoding: 'utf8',
+            maxBuffer: 1024 * 1024
+        });
+
+        if (winApiStdout && winApiStdout.trim() !== '') {
+            const printerName = winApiStdout.trim();
+            console.log(`通过WMI找到默认打印机: ${printerName}`);
+            return printerName;
+        }
+
+        // 如果WMI方式失败，使用Get-Printer命令
         const command = `powershell -NoProfile -Command "$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Printer | Where-Object {$_.Default -eq $true} | Select-Object -ExpandProperty Name"`;
         const {stdout, stderr} = await execPromise(command, {
             encoding: 'utf8',
             maxBuffer: 1024 * 1024
         });
 
-        // 检查是否有输出
         if (stdout && stdout.trim() !== '') {
             const printerName = stdout.trim();
-            console.log(`找到默认打印机: ${printerName}`);
+            console.log(`通过Get-Printer找到默认打印机: ${printerName}`);
             return printerName;
         }
 
-        // 如果没有找到默认打印机，尝试获取第一个可用打印机
-        const fallbackCommand = `powershell -NoProfile -Command "$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Printer | Select-Object -First 1 -ExpandProperty Name"`;
-        const {stdout: fallbackStdout} = await execPromise(fallbackCommand, {
+        // 最后尝试使用.NET方式获取默认打印机
+        const dotNetCommand = `powershell -NoProfile -Command "$OutputEncoding = [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Add-Type -AssemblyName System.Drawing; [System.Drawing.Printing.PrinterSettings]::new().PrinterName"`;
+        const {stdout: dotNetStdout} = await execPromise(dotNetCommand, {
             encoding: 'utf8',
             maxBuffer: 1024 * 1024
         });
 
-        if (fallbackStdout && fallbackStdout.trim() !== '') {
-            const printerName = fallbackStdout.trim();
-            console.log(`使用第一个可用打印机: ${printerName}`);
+        if (dotNetStdout && dotNetStdout.trim() !== '') {
+            const printerName = dotNetStdout.trim();
+            console.log(`通过.NET找到默认打印机: ${printerName}`);
             return printerName;
         }
 
-        console.log('系统中没有找到任何打印机');
-        return null;
+        console.error('无法找到系统默认打印机，请检查打印机设置');
+        throw new Error('系统中没有设置默认打印机');
     } catch (error) {
         console.error('获取默认打印机失败:', error);
-        return null;
+        throw new Error(`获取默认打印机失败: ${error.message}`);
     }
 }
 
@@ -123,8 +136,6 @@ function connectSocket() {
             stompClient.subscribe('/user/bubble', async (message) => {
                 try {
                     // console.log(message.body);
-                    // await printQRCode('222')
-                    // await printBarCode("111")
                 } catch (e) {
                     console.log('websocket error:', e);
                 }
@@ -136,63 +147,10 @@ function connectSocket() {
     );
 }
 
-// 二维码打印
-async function printQRCode(content) {
-    const printerName = await getDefaultPrinterName();
-    if (!printerName) throw new Error('未找到默认的打印机');
-    const printWindow = new BrowserWindow({
-        show: false,
-        webPreferences: {
-            nodeIntegration: true,
-        },
-    });
-    await printWindow.loadURL(
-        `file://${__dirname}/static/qrCode.html?content=${encodeURIComponent(content)}`
-    );
-    const options = {
-        silent: true,
-        printBackground: true,
-        pageSize: pageSize,
-        deviceName: printerName,
-        margins: {
-            marginType: 'none',
-        },
-    };
-    printWindow.webContents.print(options, (success) => {
-        printWindow.destroy();
-    });
-}
-
-// 条形码打印
-async function printBarCode(content) {
-    const printerName = await getDefaultPrinterName();
-    if (!printerName) throw new Error('未找到默认的打印机');
-    const printWindow = new BrowserWindow({
-        show: false,
-        webPreferences: {
-            nodeIntegration: true,
-        },
-    });
-    await printWindow.loadURL(
-        `file://${__dirname}/static/barCode.html?content=${encodeURIComponent(content)}`
-    );
-    const options = {
-        silent: true,
-        printBackground: false,
-        pageSize: pageSize,
-        deviceName: printerName,
-        margins: {
-            marginType: 'none',
-        },
-    };
-    printWindow.webContents.print(options, (success) => {
-        printWindow.destroy();
-    });
-}
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
-        width: 1000,
+        width: 1200,
         height: 800,
         webPreferences: {
             nodeIntegration: false,
@@ -201,7 +159,7 @@ function createWindow() {
         },
     });
     mainWindow.loadFile('dist/index.html');
-    // mainWindow.webContents.openDevTools();
+    mainWindow.webContents.openDevTools();
 
     // 获取打印机列表
     ipcMain.handle('get-printers', async (event) => {
@@ -243,14 +201,16 @@ function createWindow() {
         try {
             return await getPrintJobs(printerName);
         } catch (e) {
-            throw new Error('获取打印任务失败');
+            return [];
         }
     });
 
+
     // 二维码打印处理 - 打印设计器canvas内容
     ipcMain.handle('silent-print-qrcode', async (_, content, canvasDataURL) => {
-        const printerName = await getDefaultPrinterName();
-        if (!printerName) throw new Error('未找到默认的打印机');
+        try {
+            const printerName = await getDefaultPrinterName();
+            console.log(`准备使用默认打印机进行打印: ${printerName}`);
         
         const printWindow = new BrowserWindow({
             show: false,
@@ -290,13 +250,23 @@ function createWindow() {
         
         printWindow.webContents.print(options, (success) => {
             printWindow.destroy();
+            if (success) {
+                console.log(`二维码打印成功，使用打印机: ${printerName}`);
+            } else {
+                console.error(`二维码打印失败，打印机: ${printerName}`);
+            }
         });
+        } catch (error) {
+            console.error('二维码打印处理失败:', error);
+            throw new Error(`打印失败: ${error.message}`);
+        }
     });
 
     // 条形码打印处理 - 打印设计器canvas内容
     ipcMain.handle('silent-print-barcode', async (_, content, canvasDataURL) => {
-        const printerName = await getDefaultPrinterName();
-        if (!printerName) throw new Error('未找到默认的打印机');
+        try {
+            const printerName = await getDefaultPrinterName();
+            console.log(`准备使用默认打印机进行条形码打印: ${printerName}`);
         
         const printWindow = new BrowserWindow({
             show: false,
@@ -336,7 +306,16 @@ function createWindow() {
         
         printWindow.webContents.print(options, (success) => {
             printWindow.destroy();
+            if (success) {
+                console.log(`条形码打印成功，使用打印机: ${printerName}`);
+            } else {
+                console.error(`条形码打印失败，打印机: ${printerName}`);
+            }
         });
+        } catch (error) {
+            console.error('条形码打印处理失败:', error);
+            throw new Error(`打印失败: ${error.message}`);
+        }
     });
 
     // 页面加载完成后连接WebSocket

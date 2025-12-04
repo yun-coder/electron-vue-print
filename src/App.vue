@@ -36,23 +36,6 @@ async function fetchPrinters() {
   }
 }
 
-async function printQRCode() {
-  try {
-    await window.electronAPI.printQRCode("123");
-    message.success("二维码打印成功");
-  } catch (e) {
-    message.error("二维码打印失败");
-  }
-}
-
-async function printBarCode() {
-  try {
-    await window.electronAPI.printBarCode("456");
-    message.success("条形码打印成功");
-  } catch (e) {
-    message.error("条形码打印失败");
-  }
-}
 
 // 页面导航功能
 function navigateToPage(page) {
@@ -117,14 +100,9 @@ async function savePrintParams() {
           <div class="card-content">
             <div class="card-icon">📱</div>
             <h3 class="card-title">二维码设计器</h3>
-            <a-space direction="vertical" style="width: 100%;">
-              <a-button type="primary" block @click="navigateToPage('qrcode')">
-                静默打印二维码
-              </a-button>
-              <a-button block @click="printQRCode">
-                直接打印二维码
-              </a-button>
-            </a-space>
+            <a-button type="primary" block @click="navigateToPage('qrcode')">
+              二维码设计器
+            </a-button>
           </div>
         </a-card>
 
@@ -132,14 +110,9 @@ async function savePrintParams() {
           <div class="card-content">
             <div class="card-icon">🏷️</div>
             <h3 class="card-title">条形码设计器</h3>
-            <a-space direction="vertical" style="width: 100%;">
-              <a-button type="primary" block @click="navigateToPage('barcode')">
-                静默打印条形码
-              </a-button>
-              <a-button block @click="printBarCode">
-                直接打印条形码
-              </a-button>
-            </a-space>
+            <a-button type="primary" block @click="navigateToPage('barcode')">
+              条形码设计器
+            </a-button>
           </div>
         </a-card>
 
