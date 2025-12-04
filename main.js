@@ -192,8 +192,8 @@ async function printBarCode(content) {
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
-        width: 800,
-        height: 600,
+        width: 1000,
+        height: 800,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -247,19 +247,37 @@ function createWindow() {
         }
     });
 
-    // 二维码打印处理
-    ipcMain.handle('silent-print-qrcode', async (_, content) => {
+    // 二维码打印处理 - 打印设计器canvas内容
+    ipcMain.handle('silent-print-qrcode', async (_, content, canvasDataURL) => {
         const printerName = await getDefaultPrinterName();
         if (!printerName) throw new Error('未找到默认的打印机');
+        
         const printWindow = new BrowserWindow({
             show: false,
             webPreferences: {
                 nodeIntegration: true,
             },
         });
-        await printWindow.loadURL(
-            `file://${__dirname}/static/qrCode.html?content=${encodeURIComponent(content)}`
-        );
+        
+        // 创建临时HTML内容来显示canvas图像
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { margin: 0; padding: 0; }
+                img { display: block; width: 100%; height: auto; }
+            </style>
+        </head>
+        <body>
+            <img src="${canvasDataURL}" alt="QR Code" />
+        </body>
+        </html>
+        `;
+        
+        await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+        
         const options = {
             silent: true,
             printBackground: true,
@@ -269,33 +287,53 @@ function createWindow() {
                 marginType: 'none',
             },
         };
+        
         printWindow.webContents.print(options, (success) => {
             printWindow.destroy();
         });
     });
 
-    // 条形码打印处理
-    ipcMain.handle('silent-print-barcode', async (_, content) => {
+    // 条形码打印处理 - 打印设计器canvas内容
+    ipcMain.handle('silent-print-barcode', async (_, content, canvasDataURL) => {
         const printerName = await getDefaultPrinterName();
         if (!printerName) throw new Error('未找到默认的打印机');
+        
         const printWindow = new BrowserWindow({
             show: false,
             webPreferences: {
                 nodeIntegration: true,
             },
         });
-        await printWindow.loadURL(
-            `file://${__dirname}/static/barCode.html?content=${encodeURIComponent(content)}`
-        );
+        
+        // 创建临时HTML内容来显示canvas图像
+        const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body { margin: 0; padding: 0; }
+                img { display: block; width: 100%; height: auto; }
+            </style>
+        </head>
+        <body>
+            <img src="${canvasDataURL}" alt="Barcode" />
+        </body>
+        </html>
+        `;
+        
+        await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+        
         const options = {
             silent: true,
-            printBackground: false,
+            printBackground: true,
             pageSize: pageSize,
             deviceName: printerName,
             margins: {
                 marginType: 'none',
             },
         };
+        
         printWindow.webContents.print(options, (success) => {
             printWindow.destroy();
         });

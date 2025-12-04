@@ -4,6 +4,8 @@ import {message} from 'ant-design-vue';
 import zhCN from 'ant-design-vue/es/locale/zh_CN';
 import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
+import BarcodeDesigner from './views/BarcodeDesigner.vue';
+import QRCodeDesigner from './views/QRCodeDesigner.vue';
 
 // 设置 dayjs 为中文
 dayjs.locale('zh-cn');
@@ -11,15 +13,15 @@ dayjs.locale('zh-cn');
 // 中文语言配置
 const locale = zhCN;
 
+// 当前页面状态
+const currentPage = ref('home');
+
 const printerList = ref([]);
 const loading = ref(false);
 const showPrintParams = ref(false);
 const printParams = ref({
   pageWidth: 60, // 毫米
   pageHeight: 40, // 毫米
-  marginType: 'none',
-  silent: true,
-  printBackground: true
 });
 
 async function fetchPrinters() {
@@ -50,6 +52,15 @@ async function printBarCode() {
   } catch (e) {
     message.error("条形码打印失败");
   }
+}
+
+// 页面导航功能
+function navigateToPage(page) {
+  currentPage.value = page;
+}
+
+function goHome() {
+  currentPage.value = 'home';
 }
 
 async function getPrintJobs() {
@@ -84,103 +95,176 @@ async function savePrintParams() {
 
 <template>
   <a-config-provider :locale="locale">
-    <div class="container">
-    <h1 class="page-title">打印功能演示</h1>
+    <!-- 主页面 -->
+    <div v-if="currentPage === 'home'" class="container">
+      <!-- 导航头部 -->
+      <div class="header">
+        <h1 class="page-title">打印功能演示</h1>
+      </div>
 
-    <div class="card-grid">
-      <a-card class="function-card" hoverable>
-        <div class="card-content">
-          <div class="card-icon">📋</div>
-          <h3 class="card-title">获取打印机列表</h3>
-          <a-button type="primary" block :loading="loading" @click="fetchPrinters">
-            获取打印机列表
-          </a-button>
-        </div>
-      </a-card>
+      <div class="card-grid">
+        <a-card class="function-card" hoverable>
+          <div class="card-content">
+            <div class="card-icon">📋</div>
+            <h3 class="card-title">获取打印机列表</h3>
+            <a-button type="primary" block :loading="loading" @click="fetchPrinters">
+              获取打印机列表
+            </a-button>
+          </div>
+        </a-card>
 
-      <a-card class="function-card" hoverable>
-        <div class="card-content">
-          <div class="card-icon">📱</div>
-          <h3 class="card-title">打印二维码</h3>
-          <a-button type="primary" block @click="printQRCode">
-            静默打印二维码
-          </a-button>
-        </div>
-      </a-card>
+        <a-card class="function-card" hoverable>
+          <div class="card-content">
+            <div class="card-icon">📱</div>
+            <h3 class="card-title">二维码设计器</h3>
+            <a-space direction="vertical" style="width: 100%;">
+              <a-button type="primary" block @click="navigateToPage('qrcode')">
+                静默打印二维码
+              </a-button>
+              <a-button block @click="printQRCode">
+                直接打印二维码
+              </a-button>
+            </a-space>
+          </div>
+        </a-card>
 
-      <a-card class="function-card" hoverable>
-        <div class="card-content">
-          <div class="card-icon">🏷️</div>
-          <h3 class="card-title">打印条形码</h3>
-          <a-button type="primary" block @click="printBarCode">
-            静默打印条形码
-          </a-button>
-        </div>
-      </a-card>
+        <a-card class="function-card" hoverable>
+          <div class="card-content">
+            <div class="card-icon">🏷️</div>
+            <h3 class="card-title">条形码设计器</h3>
+            <a-space direction="vertical" style="width: 100%;">
+              <a-button type="primary" block @click="navigateToPage('barcode')">
+                静默打印条形码
+              </a-button>
+              <a-button block @click="printBarCode">
+                直接打印条形码
+              </a-button>
+            </a-space>
+          </div>
+        </a-card>
 
-      <a-card class="function-card" hoverable>
-        <div class="card-content">
-          <div class="card-icon">⚙️</div>
-          <h3 class="card-title">设置打印参数</h3>
-          <a-button type="primary" block @click="setPrintParams">
-            设置打印参数
-          </a-button>
-        </div>
-      </a-card>
+        <a-card class="function-card" hoverable>
+          <div class="card-content">
+            <div class="card-icon">⚙️</div>
+            <h3 class="card-title">设置打印参数</h3>
+            <a-button type="primary" block @click="setPrintParams">
+              设置打印参数
+            </a-button>
+          </div>
+        </a-card>
 
-      <a-card class="function-card" hoverable>
-        <div class="card-content">
-          <div class="card-icon">📄</div>
-          <h3 class="card-title">获取打印任务</h3>
-          <a-button type="primary" block @click="getPrintJobs">
-            获取打印任务
-          </a-button>
-        </div>
-      </a-card>
+        <a-card class="function-card" hoverable>
+          <div class="card-content">
+            <div class="card-icon">📄</div>
+            <h3 class="card-title">获取打印任务</h3>
+            <a-button type="primary" block @click="getPrintJobs">
+              获取打印任务
+            </a-button>
+          </div>
+        </a-card>
+      </div>
+
+      <div v-if="printerList.length" class="printer-list">
+        <h2 class="section-title">打印机列表</h2>
+        <a-list :data-source="printerList" bordered>
+          <template #renderItem="{ item }">
+            <a-list-item>
+              <a-list-item-meta>
+                <template #title>
+                  <span class="printer-name">{{ item.name }}</span>
+                  <a-tag v-if="item.isDefault" color="blue" style="margin-left: 8px;">默认</a-tag>
+                </template>
+                <template #description>
+                  状态: {{ item.status }}
+                </template>
+              </a-list-item-meta>
+            </a-list-item>
+          </template>
+        </a-list>
+      </div>
+
+      <!-- 打印参数设置弹窗 -->
+      <a-modal
+          v-model:open="showPrintParams"
+          title="打印参数设置"
+          width="600px"
+          :centered="true"
+          @ok="savePrintParams"
+      >
+        <a-form :model="printParams" layout="vertical">
+          <a-form-item label="页面宽度 (毫米)">
+            <a-input-number v-model:value="printParams.pageWidth" :min="1" :max="300" style="width: 100%;"/>
+          </a-form-item>
+
+          <a-form-item label="页面高度 (毫米)">
+            <a-input-number v-model:value="printParams.pageHeight" :min="1" :max="300" style="width: 100%;"/>
+          </a-form-item>
+        </a-form>
+      </a-modal>
     </div>
 
-    <div v-if="printerList.length" class="printer-list">
-      <h2 class="section-title">打印机列表</h2>
-      <a-list :data-source="printerList" bordered>
-        <template #renderItem="{ item }">
-          <a-list-item>
-            <a-list-item-meta>
-              <template #title>
-                <span class="printer-name">{{ item.name }}</span>
-                <a-tag v-if="item.isDefault" color="blue" style="margin-left: 8px;">默认</a-tag>
-              </template>
-              <template #description>
-                状态: {{ item.status }}
-              </template>
-            </a-list-item-meta>
-          </a-list-item>
-        </template>
-      </a-list>
+    <!-- 条形码设计器页面 -->
+    <div v-else-if="currentPage === 'barcode'" class="page-container">
+      <div class="page-header">
+        <a-button type="text" @click="goHome" class="back-button">
+          ← 返回主页
+        </a-button>
+        <h2 class="page-header-title">条形码设计器</h2>
+      </div>
+      <BarcodeDesigner />
     </div>
 
-    <!-- 打印参数设置弹窗 -->
-    <a-modal
-        v-model:open="showPrintParams"
-        title="打印参数设置"
-        width="600px"
-        :centered="true"
-        @ok="savePrintParams"
-    >
-      <a-form :model="printParams" layout="vertical">
-        <a-form-item label="页面宽度 (毫米)">
-          <a-input-number v-model:value="printParams.pageWidth" :min="1" :max="300" style="width: 100%;"/>
-        </a-form-item>
-
-        <a-form-item label="页面高度 (毫米)">
-          <a-input-number v-model:value="printParams.pageHeight" :min="1" :max="300" style="width: 100%;"/>
-        </a-form-item>
-      </a-form>
-    </a-modal>
+    <!-- 二维码设计器页面 -->
+    <div v-else-if="currentPage === 'qrcode'" class="page-container">
+      <div class="page-header">
+        <a-button type="text" @click="goHome" class="back-button">
+          ← 返回主页
+        </a-button>
+        <h2 class="page-header-title">二维码设计器</h2>
+      </div>
+      <QRCodeDesigner />
     </div>
   </a-config-provider>
 </template>
 
 <style scoped>
+.container {
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+}
+
+.page-container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.page-header {
+  padding: 16px 24px;
+  background: #fff;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.back-button {
+  font-size: 16px;
+  color: #1890ff;
+}
+
+.page-header-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
 .page-title {
   font-size: 24px;
   font-weight: 600;
@@ -220,13 +304,6 @@ async function savePrintParams() {
   font-weight: 600;
   color: #1a1a1a;
   margin: 0 0 4px 0;
-}
-
-.card-desc {
-  font-size: 12px;
-  color: #666;
-  margin: 0 0 10px 0;
-  line-height: 1.3;
 }
 
 .printer-list {
