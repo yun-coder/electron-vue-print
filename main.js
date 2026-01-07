@@ -159,7 +159,7 @@ function createWindow() {
         },
     });
     mainWindow.loadFile('dist/index.html');
-    mainWindow.webContents.openDevTools();
+    // mainWindow.webContents.openDevTools();
 
     // 获取打印机列表
     ipcMain.handle('get-printers', async (event) => {
